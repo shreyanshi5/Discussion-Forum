@@ -37,7 +37,7 @@ function App() {
           {/* Protected Routes (Accessible only when logged in) */}
           <Route path="/home" element={user ? <HomePage /> : <Navigate to="/" />} />
           <Route path="/spaces" element={user ? <SpacesPage /> : <Navigate to="/" />} />
-          <Route path="/chat" element={user ? <ChatPage /> : <Navigate to="/" />} />
+          <Route path="/chat/:spaceId" element={user ? <ChatPage /> : <Navigate to="/" />} />
           <Route path="/profile" element={user ? <Profile /> : <Navigate to="/" />} />
           {/* Catch-all route to redirect unknown paths */}
           <Route path="*" element={<Navigate to="/" />} />
