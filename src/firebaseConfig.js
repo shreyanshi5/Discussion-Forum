@@ -1,6 +1,6 @@
 // Import necessary Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut} from "firebase/auth";
 import { 
     getFirestore, 
     collection, 
@@ -10,7 +10,13 @@ import {
     getDocs, 
     updateDoc, 
     arrayUnion,
-    increment 
+    increment,
+    addDoc,
+    query,
+    where,
+    runTransaction,
+    deleteDoc,
+    onSnapshot
 } from "firebase/firestore";
 
 // Your Firebase configuration
@@ -44,6 +50,12 @@ export {
     getDocs,
     updateDoc,
     arrayUnion,
-    increment 
+    increment ,
+    addDoc,
+    query,
+    where,
+    runTransaction,
+    deleteDoc,
+    onSnapshot
 };
 
