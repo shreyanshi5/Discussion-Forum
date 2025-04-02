@@ -1,7 +1,17 @@
 // Import necessary Firebase modules
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, collection, getDoc, setDoc, doc } from "firebase/firestore";
+import { 
+    getFirestore, 
+    collection, 
+    getDoc, 
+    setDoc, 
+    doc, 
+    getDocs, 
+    updateDoc, 
+    arrayUnion,
+    increment 
+} from "firebase/firestore";
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -21,5 +31,19 @@ const provider = new GoogleAuthProvider();
 const db = getFirestore(app); // Firestore database
 
 // Export everything needed
-export { auth, provider, signInWithPopup, signOut, db, collection, getDoc, setDoc, doc };
+export { 
+    auth, 
+    provider, 
+    signInWithPopup, 
+    signOut, 
+    db, 
+    collection, 
+    getDoc, 
+    setDoc, 
+    doc, 
+    getDocs,
+    updateDoc,
+    arrayUnion,
+    increment 
+};
 

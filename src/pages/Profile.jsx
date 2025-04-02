@@ -38,7 +38,6 @@ function Profile() {
             <p className="mb-2"><strong>Name:</strong> {user.firstName} {user.lastName}</p>
             <p className="mb-2"><strong>Email:</strong> {user.email}</p>
             <p className="mb-2"><strong>Warnings:</strong> {user.warnings || 0}</p>
-            <p className="mb-2"><strong>Flagged Messages:</strong> {user.flaggedMessages || 0}</p>
             <p className="mb-2">
               <strong>Account Status:</strong>{' '}
               <span className={`px-2 py-1 rounded`}>
