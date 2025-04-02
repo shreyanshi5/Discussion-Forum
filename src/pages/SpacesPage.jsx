@@ -24,6 +24,7 @@ function SpacesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [spaceToDelete, setSpaceToDelete] = useState(null);
@@ -145,6 +146,17 @@ function SpacesPage() {
       return () => clearTimeout(timer);
     }
   }, [formError]);
+
+  // Add useEffect for handling temporary delete error display
+  useEffect(() => {
+    if (deleteError) {
+      const timer = setTimeout(() => {
+        setDeleteError(null);
+      }, 3000); // Hide after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [deleteError]);
 
   const handleJoinSpace = async (spaceId) => {
     try {
@@ -277,7 +289,7 @@ function SpacesPage() {
 
       // Check if user is the creator
       if (spaceToDelete.createdBy !== userEmail) {
-        setFormError("You can only delete spaces you've created.");
+        setDeleteError("You can only delete spaces you've created.");
         setShowDeleteModal(false);
         setSpaceToDelete(null);
         return;
@@ -345,7 +357,7 @@ function SpacesPage() {
                         setSpaceToDelete(space);
                         setShowDeleteModal(true);
                       } else {
-                        setFormError("You can only delete spaces you've created.");
+                        setDeleteError("You can only delete spaces you've created.");
                       }
                       setDropdownOpen(null);
                     }}
@@ -406,7 +418,7 @@ function SpacesPage() {
           </div>
         ) : (
           <div className="space-y-8 pb-20">
-            {/* Spaces for you section - manually added spaces */}
+            {/* Spaces for you section */}
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-white">Spaces for you</h2>
               <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -416,14 +428,14 @@ function SpacesPage() {
               </div>
             </div>
 
-            {/* Error Message */}
-            {formError && (
+            {/* Delete Error Message */}
+            {deleteError && (
               <p className="text-red-400 text-sm text-center my-4">
-                {formError}
+                {deleteError}
               </p>
             )}
 
-            {/* More Spaces section - dynamically created spaces */}
+            {/* More Spaces section */}
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-white">More Spaces</h2>
               <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
