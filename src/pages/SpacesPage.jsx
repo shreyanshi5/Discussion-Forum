@@ -372,7 +372,7 @@ function SpacesPage() {
             {space.numMembers || 0} members
           </span>
           <button 
-            className="px-4 py-2 rounded-lg transition duration-200 text-white"
+            className="px-4 py-2 rounded-lg transition duration-200 text-white min-w-[100px] text-center"
             style={{
               backgroundColor: "#6E5BA6",
               cursor: "pointer"
