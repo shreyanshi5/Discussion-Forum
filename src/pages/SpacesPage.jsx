@@ -429,6 +429,7 @@ function SpacesPage() {
               <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {spaces
                   .filter(space => space.createdAt)
+                  .sort((a, b) => b.createdAt - a.createdAt)
                   .map(renderSpaceCard)}
               </div>
             </div>
