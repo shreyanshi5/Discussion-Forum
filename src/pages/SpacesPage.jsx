@@ -135,6 +135,17 @@ function SpacesPage() {
     };
   }, []); // Empty dependency array since we want this to run once on mount
 
+  // Add useEffect for handling temporary error display
+  useEffect(() => {
+    if (formError) {
+      const timer = setTimeout(() => {
+        setFormError(null);
+      }, 3000); // Hide after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [formError]);
+
   const handleJoinSpace = async (spaceId) => {
     try {
       const userEmail = auth.currentUser?.email;
@@ -266,7 +277,7 @@ function SpacesPage() {
 
       // Check if user is the creator
       if (spaceToDelete.createdBy !== userEmail) {
-        setError("You can only delete spaces you've created.");
+        setFormError("You can only delete spaces you've created.");
         setShowDeleteModal(false);
         setSpaceToDelete(null);
         return;
@@ -334,7 +345,7 @@ function SpacesPage() {
                         setSpaceToDelete(space);
                         setShowDeleteModal(true);
                       } else {
-                        setError("You can only delete spaces you've created.");
+                        setFormError("You can only delete spaces you've created.");
                       }
                       setDropdownOpen(null);
                     }}
@@ -404,6 +415,13 @@ function SpacesPage() {
                   .map(renderSpaceCard)}
               </div>
             </div>
+
+            {/* Error Message */}
+            {formError && (
+              <p className="text-red-400 text-sm text-center my-4">
+                {formError}
+              </p>
+            )}
 
             {/* More Spaces section - dynamically created spaces */}
             <div>
