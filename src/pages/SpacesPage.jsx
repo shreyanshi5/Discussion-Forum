@@ -29,6 +29,9 @@ function SpacesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [spaceToDelete, setSpaceToDelete] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(null);
+  const [selectedSpace, setSelectedSpace] = useState(null);
+  const [showDescription, setShowDescription] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [newSpace, setNewSpace] = useState({
     spaceName: "",
     description: ""
@@ -92,6 +95,7 @@ function SpacesPage() {
               return {
                 id: doc.id,
                 spaceName: data.spaceName,
+                description: data.description,
                 createdBy: creatorEmail,
                 creatorUsername,
                 members: Array.isArray(data.members) ? data.members.filter(m => m !== "[]") : [],
@@ -251,6 +255,7 @@ function SpacesPage() {
 
       const newSpaceData = {
         spaceName: newSpace.spaceName,
+        description: newSpace.description,
         createdBy: userEmail,
         members: [userEmail],
         numMembers: 1,
@@ -260,7 +265,7 @@ function SpacesPage() {
       await addDoc(spacesCollection, newSpaceData);
       
       // Reset form and close modal
-      setNewSpace({ spaceName: "" });
+      setNewSpace({ spaceName: "", description: "" });
       setShowModal(false);
       setFormError(null);
     } catch (error) {
@@ -326,12 +331,28 @@ function SpacesPage() {
     }
   };
 
+  // Add filterSpaces function
+  const filterSpaces = (spaces, query) => {
+    if (!query) return spaces;
+    const lowerQuery = query.toLowerCase();
+    return spaces.filter(space => 
+      space.spaceName.toLowerCase().includes(lowerQuery)
+    );
+  };
+
   const renderSpaceCard = (space) => {
     const isMember = space.members?.includes(auth.currentUser?.email);
     const isCreator = space.createdBy === auth.currentUser?.email;
 
     return (
-      <div key={space.id} className="bg-[#3A3344] p-6 rounded-lg shadow-md text-white relative">
+      <div 
+        key={space.id} 
+        className="bg-[#3A3344] p-6 rounded-lg shadow-md text-white relative cursor-pointer"
+        onClick={() => {
+          setSelectedSpace(space);
+          setShowDescription(true);
+        }}
+      >
         {/* Show dropdown menu only for spaces in "More Spaces" section and if user is creator */}
         {space.createdAt && (
           <div className="absolute top-4 right-4">
@@ -391,7 +412,7 @@ function SpacesPage() {
             }}
             onClick={() => isMember ? navigate(`/chat/${space.id}`) : handleJoinSpace(space.id)}
           >
-            {isMember ? "Joined" : "Join Space"}
+            {isMember ? "Open" : "Join Space"}
           </button>
         </div>
       </div>
@@ -402,6 +423,60 @@ function SpacesPage() {
     <div className="min-h-screen bg-[#2C2638] flex">
       <Sidebar />
       <main className="flex-1 p-8 overflow-y-auto h-screen bg-[#2C2638]">
+        {/* Search Bar */}
+        <div className="mb-8">
+          <form className="relative max-w-2xl mx-auto" onSubmit={(e) => e.preventDefault()}>
+            <button className="absolute left-2 -translate-y-1/2 top-1/2 p-1">
+              <svg
+                width="17"
+                height="16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-labelledby="search"
+                className="w-5 h-5 text-gray-400"
+              >
+                <path
+                  d="M7.667 12.667A5.333 5.333 0 107.667 2a5.333 5.333 0 000 10.667zM14.334 14l-2.9-2.9"
+                  stroke="currentColor"
+                  strokeWidth="1.333"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                ></path>
+              </svg>
+            </button>
+            <input
+              className="w-full rounded-full px-8 py-3 bg-[#3A3344] border-2 border-transparent focus:outline-none focus:border-[#6E5BA6] text-white placeholder-gray-400 transition-all duration-300 shadow-md"
+              placeholder="Search spaces..."
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button 
+                type="button" 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 -translate-y-1/2 top-1/2 p-1"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 text-gray-400 hover:text-white transition-colors duration-200"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  ></path>
+                </svg>
+              </button>
+            )}
+          </form>
+        </div>
+
         {loading ? (
           <div className="bg-[#3A3344] p-6 rounded-lg shadow-md text-white">
             <p>Loading spaces...</p>
@@ -418,13 +493,26 @@ function SpacesPage() {
           </div>
         ) : (
           <div className="space-y-8 pb-20">
-            {/* Spaces for you section */}
+            {/* My Spaces section */}
             <div>
-              <h2 className="text-2xl font-semibold mb-6 text-white">Spaces for you</h2>
+              <h2 className="text-2xl font-semibold mb-6 text-white">My Spaces</h2>
               <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {spaces
-                  .filter(space => !space.createdAt)
-                  .map(renderSpaceCard)}
+                {(() => {
+                  const filteredSpaces = filterSpaces(
+                    spaces.filter(space => space.members?.includes(auth.currentUser?.email)),
+                    searchQuery
+                  ).sort((a, b) => b.createdAt - a.createdAt);
+
+                  return filteredSpaces.length > 0 ? (
+                    filteredSpaces.map(renderSpaceCard)
+                  ) : (
+                    <div className="col-span-full text-center py-8">
+                      <p className="text-gray-400">
+                        {searchQuery ? "No spaces found matching your search" : "You haven't joined any spaces yet"}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -435,14 +523,26 @@ function SpacesPage() {
               </p>
             )}
 
-            {/* More Spaces section */}
+            {/* Explore Spaces section */}
             <div>
-              <h2 className="text-2xl font-semibold mb-6 text-white">More Spaces</h2>
+              <h2 className="text-2xl font-semibold mb-6 text-white">Explore Spaces</h2>
               <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {spaces
-                  .filter(space => space.createdAt)
-                  .sort((a, b) => b.createdAt - a.createdAt)
-                  .map(renderSpaceCard)}
+                {(() => {
+                  const filteredSpaces = filterSpaces(
+                    spaces.filter(space => !space.members?.includes(auth.currentUser?.email)),
+                    searchQuery
+                  ).sort((a, b) => b.createdAt - a.createdAt);
+
+                  return filteredSpaces.length > 0 ? (
+                    filteredSpaces.map(renderSpaceCard)
+                  ) : (
+                    <div className="col-span-full text-center py-8">
+                      <p className="text-gray-400">
+                        {searchQuery ? "No spaces found matching your search" : "No spaces available to join"}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -513,6 +613,18 @@ function SpacesPage() {
                     <p className="mt-2 text-sm text-red-400">{formError}</p>
                   )}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={newSpace.description}
+                    onChange={(e) => setNewSpace(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 bg-[#2C2638] border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-[#6E5BA6]"
+                    rows="3"
+                    placeholder="Describe what this space is about..."
+                  />
+                </div>
                 <div className="flex justify-end space-x-3">
                   <button
                     type="button"
@@ -529,6 +641,29 @@ function SpacesPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Description Popup */}
+        {showDescription && selectedSpace && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-[#3A3344] rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-xl font-semibold mb-4 text-white">{selectedSpace.spaceName}</h3>
+              <p className="text-gray-300 mb-6 whitespace-pre-wrap">
+                {selectedSpace.description || "No description provided."}
+              </p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowDescription(false);
+                    setSelectedSpace(null);
+                  }}
+                  className="px-4 py-2 bg-[#6E5BA6] text-white rounded-md hover:bg-[#5D4A8F] transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
