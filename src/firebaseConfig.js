@@ -34,6 +34,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({
+  prompt: "select_account" // Forces account chooser to appear
+});
+
+signInWithPopup(auth, provider)
+  .then((result) => {
+    // successful login
+  })
+  .catch((error) => {
+    console.error("Login error", error);
+  });
 const db = getFirestore(app); // Firestore database
 
 // Export everything needed
