@@ -10,13 +10,18 @@ import {
     getDocs, 
     updateDoc, 
     arrayUnion,
+    arrayRemove,
     increment,
     addDoc,
     query,
     where,
     runTransaction,
     deleteDoc,
-    onSnapshot
+    onSnapshot,
+    orderBy,
+    limit,
+    startAfter,
+    collectionGroup
 } from "firebase/firestore";
 
 // Your Firebase configuration
@@ -57,12 +62,17 @@ export {
     getDocs,
     updateDoc,
     arrayUnion,
+    arrayRemove,
     increment,
     addDoc,
     query,
     where,
     runTransaction,
     deleteDoc,
-    onSnapshot
+    onSnapshot,
+    orderBy,
+    limit,
+    startAfter,
+    collectionGroup
 };
 

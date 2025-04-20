@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, arrayRemove, increment, runTransaction, limit, startAfter } from "firebase/firestore";
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, arrayRemove, increment, runTransaction, limit, startAfter, deleteDoc, where, getDocs } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import Sidebar from "../components/Sidebar";
 
@@ -18,6 +18,7 @@ function ChatPage() {
   const messagesEndRef = useRef(null);
   const userEmail = auth.currentUser?.email;
   const MESSAGES_PER_PAGE = 25;
+  const [activeDropdown, setActiveDropdown] = useState(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,7 +38,7 @@ function ChatPage() {
 
     fetchUserDetails();
   }, [userEmail]);
-
+  
   useEffect(() => {
     if (!userEmail) {
       setError("Please log in to access the chat");
@@ -46,13 +47,13 @@ function ChatPage() {
 
     const checkMembershipAndListen = async () => {
       try {
-        const spaceRef = doc(db, "spaces", spaceId);
-        const spaceSnap = await getDoc(spaceRef);
-        
-        if (!spaceSnap.exists()) {
+      const spaceRef = doc(db, "spaces", spaceId);
+      const spaceSnap = await getDoc(spaceRef);
+
+      if (!spaceSnap.exists()) {
           setError("Space not found");
-          return;
-        }
+        return;
+      }
 
         const spaceData = spaceSnap.data();
         setSpace(spaceData);
@@ -61,17 +62,17 @@ function ChatPage() {
         const members = Array.isArray(spaceData.members) ? spaceData.members : [];
         if (!members.includes(userEmail)) {
           setError("Join to chat");
-          return;
-        }
+        return;
+      }
 
         // Initial messages query with limit
-        const q = query(
-          collection(db, "spaces", spaceId, "messages"),
+      const q = query(
+        collection(db, "spaces", spaceId, "messages"),
           orderBy("timestamp", "desc"),
           limit(MESSAGES_PER_PAGE)
-        );
+      );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, (snapshot) => {
           const newMessages = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data()
@@ -79,9 +80,9 @@ function ChatPage() {
           setMessages(newMessages.reverse());
           setLastMessage(snapshot.docs[snapshot.docs.length - 1]);
           scrollToBottom();
-        });
+      });
 
-        return () => unsubscribe();
+      return () => unsubscribe();
       } catch (err) {
         console.error("Error:", err);
         setError("An error occurred while loading the chat");
@@ -162,10 +163,33 @@ function ChatPage() {
     if (!input.trim() || !userEmail || !userDetails) return;
 
     try {
-      await addDoc(collection(db, "spaces", spaceId, "messages"), {
+      // Get user's full name
+      const userRef = doc(db, "users", userEmail);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : null;
+
+      if (!userData) {
+        setError("Could not find user details");
+        return;
+      }
+
+      const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+
+      // Add message to space messages
+      const messageRef = await addDoc(collection(db, "spaces", spaceId, "messages"), {
         message: input,
         senderId: userEmail,
-        senderName: `${userDetails.firstName} ${userDetails.lastName}`.trim(),
+        senderName: fullName,
+        timestamp: serverTimestamp()
+      });
+
+      // Add to recent messages
+      await addDoc(collection(db, "recentMessages"), {
+        messageId: messageRef.id,
+        spaceId: spaceId,
+        message: input,
+        senderId: userEmail,
+        senderName: fullName,
         timestamp: serverTimestamp()
       });
 
@@ -175,6 +199,53 @@ function ChatPage() {
       setError("Failed to send message");
     }
   };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate();
+    return {
+      time: date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: false 
+      }),
+      date: date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    };
+  };
+
+  const deleteMessage = async (messageId) => {
+    console.log("Delete function called with messageId:", messageId);
+    
+    if (!messageId || !spaceId) {
+      console.error("Cannot delete message: Missing required information");
+      return;
+    }
+
+    try {
+      const messageRef = doc(db, "spaces", spaceId, "messages", messageId);
+      await deleteDoc(messageRef);
+      console.log("Message deleted successfully");
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (activeDropdown !== null) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeDropdown]);
 
   if (error) {
     return (
@@ -232,80 +303,130 @@ function ChatPage() {
               loadMoreMessages();
             }
           }}>
-            <div className="p-6 space-y-4">
+            <div className="px-1 py-4 space-y-2">
               {loading && (
                 <div className="text-center py-4">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#6E5BA6]"></div>
                 </div>
               )}
-              <div className="max-w-7xl mx-auto space-y-4">
+              <div className="space-y-6">
                 {messages.map((msg) => (
                   <div 
                     key={msg.id} 
                     className={`flex ${msg.senderId === userEmail ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`relative max-w-xl ${
-                      msg.senderId === userEmail 
-                        ? 'bg-[#6E5BA6] text-white rounded-l-lg rounded-tr-lg' 
-                        : 'bg-white text-gray-800 rounded-r-lg rounded-tl-lg'
-                      } p-4 shadow-md`}
-                    >
-                      <div className="font-medium text-sm mb-1">
-                        {msg.senderId === userEmail ? `${userDetails?.firstName} ${userDetails?.lastName}` : msg.senderName}
+                    <div className={`flex items-start space-x-3 max-w-[70%] ${
+                      msg.senderId === userEmail ? 'flex-row-reverse space-x-reverse' : 'flex-row'
+                    }`}>
+                      <div className="flex-shrink-0 mt-1">
+                        <div className="w-10 h-10 rounded-full bg-[#6E5BA6] flex items-center justify-center shadow-md">
+                          <span className="text-white text-sm font-medium">
+                            {msg.senderName.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-sm break-words">{msg.message}</div>
-                      <div className={`text-xs mt-2 ${
-                        msg.senderId === userEmail ? 'text-gray-200' : 'text-gray-400'
-                      }`}>
-                        {msg.timestamp?.toDate().toLocaleString()}
+                      <div className={`relative flex-shrink break-words ${
+                        msg.senderId === userEmail 
+                          ? 'bg-[#6E5BA6] text-white rounded-l-xl rounded-tr-xl' 
+                          : 'bg-white text-gray-800 rounded-r-xl rounded-tl-xl'
+                        } p-4 shadow-md min-w-[200px]`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-medium text-sm">
+                            {msg.senderName}
+                          </div>
+                          {msg.senderId === userEmail && (
+                            <div className="relative inline-block">
+                              <button 
+                                type="button"
+                                className="p-1.5 hover:bg-[#5A4A8A] rounded-full transition-colors -mr-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log("Dropdown toggle clicked");
+                                  setActiveDropdown(activeDropdown === msg.id ? null : msg.id);
+                                }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                                </svg>
+                              </button>
+                              {activeDropdown === msg.id && (
+                                <div 
+                                  className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50"
+                                >
+                                  <button 
+                                    type="button"
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 cursor-pointer"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      console.log("Delete button clicked");
+                                      deleteMessage(msg.id);
+                                      setActiveDropdown(null);
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    <span>Delete Message</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-sm break-words">{msg.message}</div>
+                        <div className={`text-xs mt-2 ${
+                          msg.senderId === userEmail ? 'text-gray-200' : 'text-gray-400'
+                        }`}>
+                          {formatDate(msg.timestamp).time} • {formatDate(msg.timestamp).date}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+            </div>
+          </div>
+        ))}
                 <div ref={messagesEndRef} />
               </div>
             </div>
           </div>
-        </div>
+      </div>
 
         <div className="bg-[#E7E3F2] border-t border-[#DCD1F2] p-4 shadow-lg flex-shrink-0">
           <div className="max-w-7xl mx-auto flex gap-4">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
               className="flex-1 px-4 py-3 rounded-lg border border-[#DCD1F2] bg-white focus:outline-none focus:ring-2 focus:ring-[#6E5BA6] focus:border-transparent transition-all duration-200"
-              placeholder="Type your message..."
+          placeholder="Type your message..."
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
                 }
               }}
-            />
-            <button 
-              onClick={sendMessage} 
+        />
+        <button
+          onClick={sendMessage}
               disabled={!input.trim()}
-              className={`send-button ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`send-button px-4 py-2 rounded-lg bg-[#6E5BA6] text-white hover:bg-[#5A4A8A] transition-colors flex items-center gap-2 text-sm ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="svg-wrapper-1">
-                <div className="svg-wrapper">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    width="24"
-                    height="24"
-                  >
-                    <path fill="none" d="M0 0h24v24H0z"></path>
-                    <path
-                      fill="currentColor"
-                      d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z"
-                    ></path>
-                  </svg>
-                </div>
-              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                width="18"
+                height="18"
+                className="text-white"
+              >
+                <path fill="none" d="M0 0h20v20H0z"></path>
+                <path
+                  fill="currentColor"
+                  d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z"
+                ></path>
+              </svg>
               <span>Send</span>
-            </button>
+        </button>
           </div>
         </div>
       </div>
