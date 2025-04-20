@@ -1,6 +1,6 @@
 // Import necessary Firebase modules
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut} from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { 
     getFirestore, 
     collection, 
@@ -28,7 +28,7 @@ const firebaseConfig = {
     messagingSenderId: "685264923895",
     appId: "1:685264923895:web:5c86d82430b679d6bd77f2",
     measurementId: "G-0FNNCSJGZZ"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -38,13 +38,9 @@ provider.setCustomParameters({
   prompt: "select_account" // Forces account chooser to appear
 });
 
-signInWithPopup(auth, provider)
-  .then((result) => {
-    // successful login
-  })
-  .catch((error) => {
-    console.error("Login error", error);
-  });
+// Set persistence to LOCAL (this will persist the auth state)
+setPersistence(auth, browserLocalPersistence);
+
 const db = getFirestore(app); // Firestore database
 
 // Export everything needed
@@ -61,7 +57,7 @@ export {
     getDocs,
     updateDoc,
     arrayUnion,
-    increment ,
+    increment,
     addDoc,
     query,
     where,

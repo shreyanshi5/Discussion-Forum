@@ -18,6 +18,7 @@ import {
 } from "../firebaseConfig";
 import Sidebar from "../components/Sidebar";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 function SpacesPage() {
   const [spaces, setSpaces] = useState([]);
@@ -180,33 +181,32 @@ function SpacesPage() {
 
         const spaceData = spaceDoc.data();
         const members = Array.isArray(spaceData.members) ? spaceData.members : [];
+        const currentNumMembers = spaceData.numMembers || members.length;
 
-        if (members.includes(userEmail)) {
-          // If user is already a member, just navigate to chat
-          return;
+        if (!members.includes(userEmail)) {
+          // Update the space document atomically only if user is not a member
+          transaction.update(spaceRef, {
+            members: arrayUnion(userEmail),
+            numMembers: currentNumMembers + 1
+          });
+
+          // Update local state after successful transaction
+          setSpaces(prevSpaces => 
+            prevSpaces.map(space => {
+              if (space.id === spaceId) {
+                return {
+                  ...space,
+                  members: [...space.members, userEmail],
+                  numMembers: currentNumMembers + 1
+                };
+              }
+              return space;
+            })
+          );
         }
-
-        // Update the space document atomically
-        transaction.update(spaceRef, {
-          members: arrayUnion(userEmail),
-          numMembers: increment(1)
-        });
       });
 
-      // Update local state after successful transaction
-      setSpaces(prevSpaces => 
-        prevSpaces.map(space => {
-          if (space.id === spaceId) {
-            return {
-              ...space,
-              members: [...space.members, userEmail],
-              numMembers: (space.numMembers || 0) + 1
-            };
-          }
-          return space;
-        })
-      );
-
+      // Navigate to chat after transaction (whether joining or already a member)
       navigate(`/chat/${spaceId}`);
     } catch (error) {
       console.error("Error joining space:", error);
@@ -410,7 +410,14 @@ function SpacesPage() {
               backgroundColor: "#6E5BA6",
               cursor: "pointer"
             }}
-            onClick={() => isMember ? navigate(`/chat/${space.id}`) : handleJoinSpace(space.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isMember) {
+                navigate(`/chat/${space.id}`);
+              } else {
+                handleJoinSpace(space.id);
+              }
+            }}
           >
             {isMember ? "Open" : "Join Space"}
           </button>

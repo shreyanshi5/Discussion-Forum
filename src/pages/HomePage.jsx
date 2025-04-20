@@ -26,7 +26,7 @@ function Home() {
         <Sidebar />
         {/* Main Content */}
         <div className="flex-1 p-8">
-          <h2 className="text-white text-2xl font-semibold mb-6">Recent Posts</h2>
+          <h2 className="homepage-heading text-2xl font-semibold">Recent Posts</h2>
           {/* Posts will be displayed here */}
         </div>
       </div>

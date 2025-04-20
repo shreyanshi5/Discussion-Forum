@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is a member of a space
+    function isMember(spaceId) {
+      return isAuthenticated() && 
+        request.auth.token.email in get(/databases/$(database)/documents/spaces/$(spaceId)).data.members;
+    }
+
+    // Space rules
+    match /spaces/{spaceId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      
+      // Messages within a space
+      match /messages/{messageId} {
+        allow read: if isMember(spaceId);
+        allow create: if isMember(spaceId) && 
+          request.resource.data.senderId == request.auth.token.email;
+        allow update, delete: if false; // Messages cannot be edited or deleted
+      }
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.token.email == userId;
+    }
+  }
+} 
