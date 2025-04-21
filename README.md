@@ -8,6 +8,6 @@ A discussion forum web application built with **Firebase Authentication** and **
 - **Home Page**: View recent posts and navigate easily
 - **Signup & Login Pages**: Secure user registration and login
 - **Spaces Page**: Join and explore different discussion spaces
-- **Chat Page**: Post messages, upload files, and engage in discussions
-- **Profile Page**: View user warnings and flagged messages
-- **NLP Integration (Future)**: Detect foul language and issue warnings
+- **Chat Page**: Post messages and engage in discussions
+- **Profile Page**: View user warnings and account status (blocked / not blocked)
+- **NLP Integration**: Detect foul language and issue warnings. Blocks user from taking part in conversation if warnings exceed more than 3.
