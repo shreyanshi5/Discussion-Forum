@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { auth, db, doc, getDoc } from "../firebaseConfig";
+import { auth, db, doc, getDoc, updateDoc } from "../firebaseConfig";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import WarningPopup from "../components/WarningPopup";
 
 function Profile() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [warningType, setWarningType] = useState('warning');
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -22,11 +26,36 @@ function Profile() {
     fetchUserProfile();
   }, []);
 
+  const handleUnblock = async () => {
+    try {
+      const userRef = doc(db, "users", auth.currentUser.email);
+      await updateDoc(userRef, {
+        isBlocked: false,
+        warnings: 0
+      });
+      
+      // Refresh user data
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        setUser(userSnap.data());
+      }
+      
+      setWarningMessage('Your account has been unblocked successfully.');
+      setWarningType('warning');
+      setShowWarning(true);
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      setWarningMessage('Failed to unblock account. Please try again.');
+      setWarningType('error');
+      setShowWarning(true);
+    }
+  };
+
   if (!user) {
     return <div className="text-white p-8">Loading Profile...</div>;
   }
 
-  const isBlocked = (user.warnings || 0) > 3;
+  const isBlocked = (user.warnings || 0) >= 3;
 
   return (
     <div className="min-h-screen bg-[#2C2638]">
@@ -40,13 +69,28 @@ function Profile() {
             <p className="mb-2"><strong>Warnings:</strong> {user.warnings || 0}</p>
             <p className="mb-2">
               <strong>Account Status:</strong>{' '}
-              <span className={`px-2 py-1 rounded`}>
+              <span className="px-2 py-1 rounded">
                 {isBlocked ? 'Blocked' : 'Not Blocked'}
               </span>
             </p>
+            {isBlocked && (
+              <button
+                onClick={handleUnblock}
+                className="mt-4 px-4 py-2 bg-[#3A3344] text-white border border-white rounded hover:bg-[#4A4354] transition-colors"
+              >
+                Unblock Account
+              </button>
+            )}
           </div>
         </main>
       </div>
+      {showWarning && (
+        <WarningPopup
+          message={warningMessage}
+          type={warningType}
+          onClose={() => setShowWarning(false)}
+        />
+      )}
     </div>
   );
 }

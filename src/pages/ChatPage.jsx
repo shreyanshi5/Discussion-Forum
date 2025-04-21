@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, getDoc, updateDoc, arrayRemove, increment, runTransaction, limit, startAfter, deleteDoc, where, getDocs } from "firebase/firestore";
 import { db, auth } from "../firebaseConfig";
 import Sidebar from "../components/Sidebar";
+import { checkMessage } from '../services/nlpService';
+import WarningPopup from '../components/WarningPopup';
 
 function ChatPage() {
   const { spaceId } = useParams();
@@ -19,6 +21,9 @@ function ChatPage() {
   const userEmail = auth.currentUser?.email;
   const MESSAGES_PER_PAGE = 25;
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [warningType, setWarningType] = useState('warning');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,44 +164,77 @@ function ChatPage() {
     }
   };
 
-  const sendMessage = async () => {
+  const sendMessage = async (e) => {
+    e.preventDefault();
     if (!input.trim() || !userEmail || !userDetails) return;
 
     try {
-      // Get user's full name
-      const userRef = doc(db, "users", userEmail);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.exists() ? userSnap.data() : null;
-
-      if (!userData) {
-        setError("Could not find user details");
+      // Get user details first
+      const userDoc = await getDoc(doc(db, 'users', userEmail));
+      const userData = userDoc.data();
+      
+      // Check if user is already blocked
+      if (userData.isBlocked) {
+        setWarningMessage('Your account has been blocked due to multiple warnings. You cannot participate in conversations.');
+        setWarningType('error');
+        setShowWarning(true);
+        setInput(''); // Clear the input
         return;
       }
 
-      const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+      const senderName = `${userData.firstName} ${userData.lastName}`;
 
-      // Add message to space messages
-      const messageRef = await addDoc(collection(db, "spaces", spaceId, "messages"), {
+      // Add message to Firestore first
+      const messageRef = await addDoc(collection(db, 'spaces', spaceId, 'messages'), {
         message: input,
         senderId: userEmail,
-        senderName: fullName,
-        timestamp: serverTimestamp()
+        senderName: senderName,
+        timestamp: serverTimestamp(),
+        flagged: false
       });
 
-      // Add to recent messages
-      await addDoc(collection(db, "recentMessages"), {
-        messageId: messageRef.id,
-        spaceId: spaceId,
-        message: input,
-        senderId: userEmail,
-        senderName: fullName,
-        timestamp: serverTimestamp()
-      });
+      // Clear input immediately after sending
+      setInput('');
 
-      setInput("");
-    } catch (err) {
-      console.error("Error sending message:", err);
-      setError("Failed to send message");
+      // Then check for toxicity
+      const nlpResult = await checkMessage(input);
+      
+      if (nlpResult.is_toxic) {
+        // Update message with flagged status
+        await updateDoc(messageRef, {
+          flagged: true
+        });
+
+        const currentWarnings = userData.warnings || 0;
+        const newWarnings = currentWarnings + 1;
+        
+        // Update user warnings and block status in a transaction to ensure atomicity
+        await runTransaction(db, async (transaction) => {
+          const userRef = doc(db, 'users', userEmail);
+          const userDoc = await transaction.get(userRef);
+          const userData = userDoc.data();
+          
+          transaction.update(userRef, {
+            warnings: newWarnings,
+            isBlocked: newWarnings >= 3
+          });
+        });
+
+        if (newWarnings >= 3) {
+          setWarningMessage('Your account has been blocked due to multiple warnings. You cannot participate in conversations.');
+          setWarningType('error');
+          setShowWarning(true);
+        } else {
+          setWarningMessage(`Warning: Your message contains inappropriate content. You have ${3 - newWarnings} warnings remaining.`);
+          setWarningType('warning');
+          setShowWarning(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setWarningMessage('Error sending message. Please try again.');
+      setWarningType('error');
+      setShowWarning(true);
     }
   };
 
@@ -310,7 +348,7 @@ function ChatPage() {
                 </div>
               )}
               <div className="space-y-6">
-                {messages.map((msg) => (
+        {messages.map((msg) => (
                   <div 
                     key={msg.id} 
                     className={`flex ${msg.senderId === userEmail ? 'justify-end' : 'justify-start'}`}
@@ -403,12 +441,15 @@ function ChatPage() {
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  sendMessage();
+                  sendMessage(e);
                 }
               }}
         />
         <button
-          onClick={sendMessage}
+          onClick={(e) => {
+            e.preventDefault();
+            sendMessage(e);
+          }}
               disabled={!input.trim()}
               className={`send-button px-4 py-2 rounded-lg bg-[#6E5BA6] text-white hover:bg-[#5A4A8A] transition-colors flex items-center gap-2 text-sm ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
@@ -429,6 +470,13 @@ function ChatPage() {
         </button>
           </div>
         </div>
+        {showWarning && (
+          <WarningPopup
+            message={warningMessage}
+            type={warningType}
+            onClose={() => setShowWarning(false)}
+          />
+        )}
       </div>
     </div>
   );
