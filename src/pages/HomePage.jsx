@@ -22,6 +22,7 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userCache, setUserCache] = useState({});
+  const MAX_TOTAL_MESSAGES = 15;
 
   useEffect(() => {
     let unsubscribes = [];
@@ -103,9 +104,10 @@ function Home() {
                     newMessages[index] = message;
                   }
                 });
-                return newMessages.sort((a, b) => 
-                  (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0)
-                );
+                // Sort by timestamp and limit to MAX_TOTAL_MESSAGES
+                return newMessages
+                  .sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0))
+                  .slice(0, MAX_TOTAL_MESSAGES);
               });
               setLoading(false);
             } catch (err) {
